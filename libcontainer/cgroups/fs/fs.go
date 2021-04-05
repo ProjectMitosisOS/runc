@@ -18,7 +18,7 @@ import (
 
 var (
 	subsystems = []subsystem{
-		&CpusetGroup{},
+		// &CpusetGroup{},
 		&DevicesGroup{},
 		&MemoryGroup{},
 		&CpuGroup{},

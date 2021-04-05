@@ -189,8 +189,10 @@ var fork2ContainerCommand = cli.Command{
 			return err
 		}
 		// t1 := time.Now().UnixNano()
-		// fmt.Println(pid, " after applying the cgroups")
-		// fmt.Println(t1 - t0)
+		// fmt.Println(pid, " after applying this pid the cgroups")
+		// fmt.Printf("apply cgroup %dns\n", t1-t0)
+		// fmt.Printf("total time %dns\n", t1-start)
+		fmt.Println(pid)
 		return nil
 	},
 }

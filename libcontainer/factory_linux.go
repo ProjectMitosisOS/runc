@@ -148,13 +148,7 @@ func RootlessCgroupfs(l *LinuxFactory) error {
 // containers that use the Intel RDT "resource control" filesystem to
 // create and manage Intel RDT resources (e.g., L3 cache, memory bandwidth).
 func IntelRdtFs(l *LinuxFactory) error {
-	if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
-		l.NewIntelRdtManager = nil
-	} else {
-		l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
-			return intelrdt.NewManager(config, id, path)
-		}
-	}
+	l.NewIntelRdtManager = nil
 	return nil
 }
 
