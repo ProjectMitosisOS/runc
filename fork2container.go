@@ -48,6 +48,7 @@ sendMultipleFDs(char *sockPath, int chrootFD, int utsNamespaceFD, int pidNamespa
 	}
 
 	char pid_arr[20];
+	memset(pid_arr, 0, sizeof(pid_arr));
 	if (read(s, pid_arr, 20) < 0) {
 		return -1;
 	}
