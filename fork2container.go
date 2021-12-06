@@ -18,6 +18,59 @@ package main
 int
 sendfds(int s, int *fds, int fdcount); // defined in fork.go
 
+int
+unlock(int fd) {
+	// unlock the execution of the child
+	char c = 'a';
+	int ret = send(fd, &c, sizeof(c), 0);
+	return ret;
+}
+
+int
+getSockFD(char *sockPath) {
+	int s, len;
+	struct sockaddr_un remote;
+
+	if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+		return -1;
+	}
+
+	remote.sun_family = AF_UNIX;
+	strcpy(remote.sun_path, sockPath);
+	len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+	if (connect(s, (struct sockaddr *)&remote, len) == -1) {
+		return -1;
+	}
+	return s;
+}
+
+int closeSockFD(int s) {
+	close(s);
+}
+
+int
+sendMultipleFDsWithFD(int s, int chrootFD, int utsNamespaceFD, int pidNamespaceFD, int ipcNamespaceFD, int mntNamespaceFD) {
+	int fds[5];
+	fds[0] = chrootFD;
+	fds[1] = utsNamespaceFD;
+	fds[2] = pidNamespaceFD;
+	fds[3] = ipcNamespaceFD;
+	fds[4] = mntNamespaceFD;
+
+	if (sendfds(s, fds, 5) == -1) {
+		return -1;
+	}
+
+	char pid_arr[20];
+	memset(pid_arr, 0, sizeof(pid_arr));
+	if (read(s, pid_arr, 20) < 0) {
+		return -1;
+	}
+
+	int pid = atoi(pid_arr);
+	return pid;
+}
+
 // Send multiple FDs to the unix socket
 int
 sendMultipleFDs(char *sockPath, int chrootFD, int utsNamespaceFD, int pidNamespaceFD, int ipcNamespaceFD, int mntNamespaceFD) {
@@ -68,6 +121,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"syscall"
 	"unsafe"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
@@ -179,7 +233,7 @@ var fork2ContainerCommand = cli.Command{
 		// fmt.Println(zygoteContainerForkSocketPath)
 
 		// Send the fds to the socket
-		pid, err := invokeMultipleFDs(zygoteContainerForkSocketPath, targetContainerRootfsFd, utsNamespaceFd, pidNamespaceFd, ipcNamespaceFd, mntNamespaceFd)
+		pid, fd, err := invokeMultipleFDs(zygoteContainerForkSocketPath, targetContainerRootfsFd, utsNamespaceFd, pidNamespaceFd, ipcNamespaceFd, mntNamespaceFd)
 		if err != nil {
 			return err
 		}
@@ -189,21 +243,46 @@ var fork2ContainerCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+		ret := C.unlock(C.int(fd))
+		if ret < 0 {
+			return errors.New("fail to write unlock signal to socket")
+		}
 		// t1 := time.Now().UnixNano()
 		// fmt.Println(pid, " after applying this pid the cgroups")
 		// fmt.Printf("apply cgroup %dns\n", t1-t0)
 		// fmt.Printf("total time %dns\n", t1-start)
 		fmt.Println(pid)
+		waitForExit(pid)
+		C.closeSockFD(C.int(fd))
 		return nil
 	},
 }
 
-func invokeMultipleFDs(socketPath string, rootDir *os.File, utsNamespaceFd *os.File, pidNamespaceFd *os.File, ipcNamespaceFd *os.File, mntNamespaceFd *os.File) (int, error) {
+func waitForExit(pid int) {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return
+	}
+	for true {
+		err = process.Signal(syscall.Signal(0))
+		if err != nil {
+			break
+		}
+	}
+	return
+}
+
+func invokeMultipleFDs(socketPath string, rootDir *os.File, utsNamespaceFd *os.File, pidNamespaceFd *os.File, ipcNamespaceFd *os.File, mntNamespaceFd *os.File) (int, int, error) {
 	cSock := C.CString(socketPath)
 	defer C.free(unsafe.Pointer(cSock))
-	pid, err := C.sendMultipleFDs(cSock, C.int(rootDir.Fd()), C.int(utsNamespaceFd.Fd()), C.int(pidNamespaceFd.Fd()), C.int(ipcNamespaceFd.Fd()), C.int(mntNamespaceFd.Fd()))
+	fd, err := C.getSockFD(cSock)
 	if err != nil {
-		return -1, err
+		return -1, -1, err
 	}
-	return int(pid), nil
+	pid, err := C.sendMultipleFDsWithFD(C.int(fd), C.int(rootDir.Fd()), C.int(utsNamespaceFd.Fd()), C.int(pidNamespaceFd.Fd()), C.int(ipcNamespaceFd.Fd()), C.int(mntNamespaceFd.Fd()))
+	if err != nil {
+		C.closeSockFD(C.int(fd))
+		return -1, -1, err
+	}
+	return int(pid), int(fd), nil
 }
