@@ -22,7 +22,7 @@ make static # Artifact: runc
 
 ```bash
 cd rfork
-make base-image base-spin-image
+make base-image base-spin-image # TODO: need to remove the dependency to the val registry
 cd benchmarks/concurrent-latency
 go build bootstrapRootFS.go
 sudo ./bootstrapRootFS 1 10 # prepare 1 rootfs for zygote container and 10 rootfs for app containers. (app container is a container where we place the newly-forked process)
