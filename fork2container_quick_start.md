@@ -7,8 +7,8 @@ go > 1.13, libseccomp, gcc, ...
 ## Clone
 
 ```bash
-git clone https://ipads.se.sjtu.edu.cn:1312/xcontainer/runc.git
-git clone https://ipads.se.sjtu.edu.cn:1312/xcontainer/rfork-python-runtime.git rfork
+git clone https://github.com/ProjectMitosisOS/runc.git
+git clone https://github.com/ProjectMitosisOS/fork-python-runtime.git rfork
 ```
 
 **rfork-python-runtime** should be cloned in a short path to avoid possible buffer overflow in the path to unix domain socket.
